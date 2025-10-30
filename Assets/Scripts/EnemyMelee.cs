@@ -3,32 +3,31 @@ using UnityEngine;
 public class EnemyMelee : EnemyBaseNav
 {
     [Header("Bands (m)")]
-    public float attackRange = 2f;        // <= attackRange -> attack
-    public float advanceMax  = 20f;       // (attackRange, advanceMax] -> chase ; > advanceMax -> idle
+    public float attackRange = 2f;  
+    public float advanceMax  = 20f;
 
     [Header("Animator States (exact names)")]
-    public string meleeState = "Melee";   // make this clip NON-looping
+    public string meleeState = "Melee";   
     [Range(0f, 1f)] public float hitAtNormalized = 0.35f;
 
     [Header("Timing")]
-    public float meleeCooldown    = 1.2f; // lockout after each attack
-    public float maxMeleeDuration = 2.0f; // fail-safe in case of bad clips
+    public float meleeCooldown    = 1.2f; 
+    public float maxMeleeDuration = 2.0f;
 
     [Header("Hit Volume")]
-    public Transform meleeOrigin;         // place in front of chest (between arms)
+    public Transform meleeOrigin;      
     public float meleeRadius = 0.8f;
 
     [Header("Effects")]
-    public float knockbackForce = 6f;     // used by PlayerController.AddImpulse
-    public float verticalKnock = 0.0f;   // small lift (0–0.5)
+    public float knockbackForce = 6f;   
+    public float verticalKnock = 0.0f; 
 
     [Header("Damage")]
-    public int meleeDamage = 2;   // small enemy default (set 4 on large if it has a melee)
+    public int meleeDamage = 2; 
     
     [Header("Debug")]
     public bool logDebug = false;
 
-    // ---- internal ----
     float cooldownTimer = 0f;
     bool  inMelee = false;
     bool  hitThisCycle = false;
@@ -36,7 +35,7 @@ public class EnemyMelee : EnemyBaseNav
     int   cycleAtStart = -1;
     float meleeClock = 0f;
 
-    // Player refs (root that has CharacterController)
+    // player refs
     Transform           playerRoot;
     CharacterController playerCC;
     PlayerController    playerController;
@@ -64,7 +63,7 @@ public class EnemyMelee : EnemyBaseNav
         }
     }
 
-    // ===== Movement intent per band (same pattern as EnemyRanged) =====
+    // ===== movement intent per band  =====
     protected override bool TryGetGoal(out Vector3 goalWorld)
     {
         goalWorld = default;
@@ -84,17 +83,16 @@ public class EnemyMelee : EnemyBaseNav
             return true;
         }
 
-        // > advanceMax -> idle
         return false;
     }
 
-    // ===== Tick after nav =====
+    // ===== tick after nav =====
     protected override void AfterMove()
     {
         cooldownTimer -= Time.deltaTime;
         FaceTargetFlat();
 
-        // --- Drive locomotion animation when NOT attacking ---
+        // --- drive locomotion animation when NOT attacking ---
         if (!inMelee && animator != null && !animator.IsInTransition(0))
         {
             float d = (playerRoot != null)
@@ -113,10 +111,9 @@ public class EnemyMelee : EnemyBaseNav
                 if (!string.IsNullOrEmpty(idleState) && !animator.GetCurrentAnimatorStateInfo(0).IsName(idleState))
                     animator.CrossFadeInFixedTime(idleState, 0.05f);
             }
-            // if d <= attackRange we’ll enter melee below
         }
 
-        // --- Attack state machine (ranged-style) ---
+        // --- attack state machine (ranged-style) ---
         if (inMelee)
         {
             DriveMeleeState();
@@ -127,7 +124,7 @@ public class EnemyMelee : EnemyBaseNav
             BeginMelee();
     }
 
-    // Range-only start condition + cooldown. No LOS/transition gating beyond that.
+    // range-only start condition + cooldown. No LOS/transition gating beyond that.
     bool CanStartMelee()
     {
         if (cooldownTimer > 0f) return false;
@@ -164,7 +161,7 @@ public class EnemyMelee : EnemyBaseNav
         {
             if (!inOurState)
             {
-                if (meleeClock > 0.5f) { EndMelee(); } // safety bailout
+                if (meleeClock > 0.5f) { EndMelee(); } 
                 return;
             }
             activeStateHash = st.fullPathHash;

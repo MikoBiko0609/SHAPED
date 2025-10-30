@@ -3,19 +3,12 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
-/// <summary>
-/// Floating/spinning key visual + interaction (dropped keys vs exit-grid keys).
-/// Manages the 2×4 exit key grid, the 4-key code logic, and the per-run unique
-/// large-drop color sequence. Grid keys are now spaced wider, sit +1 higher,
-/// and are picked up by proximity (no E press).
-/// </summary>
 public class KeyFloating : MonoBehaviour
 {
-    // ───────────────────────────── Visuals ─────────────────────────────
     [Header("Visuals")]
-    public KeyColor keyColor = KeyColor.Pink;                   // default; can be overridden at runtime
-    public List<MeshRenderer> colorRenderers = new();            // assign all child MeshRenderers here
-    public string colorProperty = "_Color";                      // "_Color" for Standard/Unlit, "_BaseColor" for URP Lit
+    public KeyColor keyColor = KeyColor.Pink;                   
+    public List<MeshRenderer> colorRenderers = new();            
+    public string colorProperty = "_Color";           
 
     [Header("Float/Spin")]
     public float bobAmplitude = 0.15f;
@@ -23,18 +16,16 @@ public class KeyFloating : MonoBehaviour
     public float spinDegPerSec = 90f;
 
     [Header("Visual Offset")]
-    public float heightOffset = 0f;                              // exit-grid keys will add +1 only
+    public float heightOffset = 0f;                             
 
     [Header("Lifetime")]
-    public float autoDespawnSeconds = 0f;                        // 0 = never
+    public float autoDespawnSeconds = 0f;                 
 
-    // ─────────────────────────── Interaction ───────────────────────────
     [Header("Interaction")]
-    public bool isExitGridKey = false;                           // exit-grid keys are pickable
+    public bool isExitGridKey = false;                           
     public float pickupRadius = 1.3f;
     public string playerTag = "Player";
 
-    // ───────────────────────── Instance state ──────────────────────────
     float t0;
     float baseY;
     MaterialPropertyBlock mpb;
@@ -55,39 +46,36 @@ public class KeyFloating : MonoBehaviour
 
     void Update()
     {
-        // Bob + spin (grid & dropped alike)
         float t = Time.time - t0;
         Vector3 p = transform.position;
         p.y = baseY + heightOffset + Mathf.Sin(t * bobSpeed) * bobAmplitude;
         transform.position = p;
         transform.Rotate(Vector3.up, spinDegPerSec * Time.deltaTime, Space.World);
 
-        // Exit-grid: auto-pickup by proximity
+        // exit-grid: auto-pickup by proximity
         if (isExitGridKey && PlayerWithinRadius(out _))
         {
-            // Consume immediately on enter
+            // consume on enter
             bool ok = ValidatePick(keyColor);
             Destroy(gameObject);
 
             if (!ok)
             {
-                // Wrong → wipe grid & require re-kill (also reshuffles boss-run colors)
                 DespawnExitGrid();
                 ResetBossDrops();
             }
             else
             {
-if (picksSoFar >= requiredPicks)
-{
-    GameObject door = GameObject.Find("DoorRoot");
-    if (door != null)
-    {
-        var dc = door.GetComponent<DoorController>();
-        if (dc != null)
-            dc.OpenDoor();
-    }
-}
-
+                if (picksSoFar >= requiredPicks)
+                {
+                    GameObject door = GameObject.Find("DoorRoot");
+                    if (door != null)
+                    {
+                        var dc = door.GetComponent<DoorController>();
+                        if (dc != null)
+                            dc.OpenDoor();
+                    }
+                }
             }
         }
     }
@@ -101,7 +89,7 @@ if (picksSoFar >= requiredPicks)
         return (player.position - transform.position).sqrMagnitude <= pickupRadius * pickupRadius;
     }
 
-    // ────────────────────────── Color helpers ──────────────────────────
+    // color helpers
     public void SetColor(KeyColor c)
     {
         keyColor = c;
@@ -148,23 +136,23 @@ if (picksSoFar >= requiredPicks)
 
     public void SetModeExitGrid()
     {
-        isExitGridKey = true;            // grid keys ARE pickable
+        isExitGridKey = true;            // grid keys are pickable
         heightOffset += 1f;              // raise ONLY the grid keys by +1
     }
 
-    // ─────────────────────── Exit grid (static) ────────────────────────
+    // exit grid
     static GameObject sharedKeyPrefab;
     public static void SetSharedPrefab(GameObject keyPrefab) => sharedKeyPrefab = keyPrefab;
 
-    // Large-enemy drops needed before the grid appears
+    // large-enemy drops needed before the grid appears
     static int bossDrops = 0;
     public static int requiredBossDrops = 4;
 
-    // 8 total colors (must match your KeyColor enum entries)
+    // 8 colors
     static readonly KeyColor[] allEight =
         { KeyColor.Red, KeyColor.Blue, KeyColor.Green, KeyColor.Purple, KeyColor.Pink, KeyColor.Orange, KeyColor.Black, KeyColor.White };
 
-    // The 4 correct colors for THIS run (tied to the 4 large-enemy drops)
+    // the 4 correct colors for THIS run
     static KeyColor[] runSolution = new KeyColor[4];
 
     static HashSet<KeyColor> correctSet = new();
@@ -172,12 +160,8 @@ if (picksSoFar >= requiredPicks)
     static int requiredPicks = 4;
 
     static List<KeyFloating> activeGrid = new();
-    static Transform exitRoot; // empty in scene named "ExitGridRoot"
+    static Transform exitRoot; 
 
-    /// <summary>
-    /// Reset boss drop count and reshuffle the per-run unique large-drop colors.
-    /// Called on wrong pick (new attempt) or can be called on restart.
-    /// </summary>
     public static void ResetBossDrops()
     {
         bossDrops = 0;
@@ -213,27 +197,27 @@ if (picksSoFar >= requiredPicks)
             exitRoot = rootGO.transform;
         }
 
-        // Clear previous grid
+        // clears previous grid
         DespawnExitGrid();
 
-        // The correct set IS the 4 unique large-drop colors for this run
+        // the correct set IS the 4 unique large-drop colors for this run
         correctSet.Clear();
         picksSoFar = 0;
         requiredPicks = 4;
         for (int i = 0; i < 4; i++) correctSet.Add(runSolution[i]);
 
-        // Build a 2×4 grid (one of each of the 8 colors)
+        // builds a 2×4 grid (one of each of the 8 colors)
         Vector3 basePos = exitRoot.position;
         Quaternion rot = exitRoot.rotation;
 
-        // Spread keys further apart
+        // spreads keys further apart
         const float spacingX = 2.2f;
         const float spacingZ = 2.2f;
 
         for (int i = 0; i < allEight.Length; i++)
         {
-            int row = i / 4;                           // 0..1
-            int col = i % 4;                           // 0..3
+            int row = i / 4;                           
+            int col = i % 4;                         
             Vector3 offset = new((col - 1.5f) * spacingX, 0f, (row - 0.5f) * spacingZ);
 
             var go = Object.Instantiate(sharedKeyPrefab, basePos + offset, rot);
@@ -259,7 +243,7 @@ if (picksSoFar >= requiredPicks)
         activeGrid.Clear();
     }
 
-    // Returns true if the pick is correct (and counts toward completion).
+    // returns true if the pick is correct 
     static bool ValidatePick(KeyColor picked)
     {
         if (!correctSet.Contains(picked))
@@ -276,24 +260,21 @@ if (picksSoFar >= requiredPicks)
         return true;
     }
 
-    // ─────────────── Unique large-drop colors per run (no repeats) ───────────────
     static Queue<KeyColor> runLargeDropQueue;   // 4 unique colors in random order
     static bool runColorsReady = false;
 
-    /// <summary>Ensure a fresh shuffled queue of 4 unique colors for large enemy drops, and store them as this run's solution.</summary>
     static void EnsureRunLargeDropColors()
     {
         if (runColorsReady && runLargeDropQueue != null && runLargeDropQueue.Count > 0) return;
 
         var bag = new List<KeyColor>(allEight);
-        // Fisher–Yates shuffle the bag so the first four are random and unbiased
         for (int i = bag.Count - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
             (bag[i], bag[j]) = (bag[j], bag[i]);
         }
 
-        // Take the first 4 unique colors for this run
+        // take the first 4 unique colors for this run
         runLargeDropQueue = new Queue<KeyColor>(4);
         for (int i = 0; i < 4; i++)
         {
@@ -304,7 +285,6 @@ if (picksSoFar >= requiredPicks)
         runColorsReady = true;
     }
 
-    /// <summary>Call when starting a new attempt (e.g., wrong pick), to reshuffle the next run.</summary>
     static void ResetRunLargeDropColors()
     {
         runColorsReady = false;
@@ -312,10 +292,6 @@ if (picksSoFar >= requiredPicks)
         EnsureRunLargeDropColors();
     }
 
-    /// <summary>
-    /// Get the next unique color for a large enemy drop (4 total per run).
-    /// If more than 4 larges die, we re-ensure (shouldn't happen in your flow).
-    /// </summary>
     public static KeyColor NextLargeDropColor()
     {
         EnsureRunLargeDropColors();

@@ -9,20 +9,20 @@ public class EnemyRanged : EnemyBaseNav
     public float advanceMax = 20f;
 
     [Header("Animator States (exact names)")]
-    public string throwState = "Throw";               // make clip non-looping
-    [Range(0f, 1f)] public float releaseAtNormalized = 0.75f; // frame 90/120
+    public string throwState = "Throw";               
+    [Range(0f, 1f)] public float releaseAtNormalized = 0.75f; // frame 90/120 to make throw
 
     [Header("Timing")]
     public float cooldownAfterThrow = 1.5f;
-    public float maxThrowDuration = 2.0f;             // fail-safe to exit throw
+    public float maxThrowDuration = 2.0f;           
 
     [Header("Projectile")]
-    public GameObject projectilePrefab;               // your Cube_Projectile prefab
-    public Transform projectileHolder;                // hand/holder transform (where it spawns)
-    public GameObject holderVisual;                   // the unpacked cube you always show in the hand
-    public Transform muzzleFallback;                  // optional
+    public GameObject projectilePrefab;              
+    public Transform projectileHolder;               
+    public GameObject holderVisual;                  
+    public Transform muzzleFallback;                  
     public float projectileSpeed = 12f;
-    public float upwardBias = 0f;                     // keep 0 to stay flat
+    public float upwardBias = 0f;                   
 
     [Header("Homing (optional)")]
     public bool addHoming = true;
@@ -30,9 +30,8 @@ public class EnemyRanged : EnemyBaseNav
     public float homingDuration = 1.0f;
 
     [Header("Projectile Damage")]
-    public int projectileDamage = 4;   // large enemy deals 4 to player
+    public int projectileDamage = 4;   
 
-    // Internal
     float fireTimer = 0f;
     bool inThrow = false;
     bool releasedThisCycle = false;
@@ -46,7 +45,7 @@ public class EnemyRanged : EnemyBaseNav
         if (maxThrowDuration < 0.2f) maxThrowDuration = 0.2f;
     }
 
-    // ===== Movement intent per band =====
+    // ===== movement intent per band =====
     protected override bool TryGetGoal(out Vector3 goalWorld)
     {
         float d = Vector3.Distance(transform.position, target.position);
@@ -77,7 +76,7 @@ public class EnemyRanged : EnemyBaseNav
         return false;
     }
 
-    // ===== Tick after nav =====
+    // ===== tick after nav =====
     protected override void AfterMove()
     {
         fireTimer -= Time.deltaTime;
@@ -93,13 +92,11 @@ public class EnemyRanged : EnemyBaseNav
             BeginThrow();
     }
 
-    // Range-only start condition + cooldown. No LOS gating anymore.
     bool CanStartThrow()
     {
         if (fireTimer > 0f) return false;
         if (target == null || animator == null) return false;
 
-        // Don’t re-enter while already in the state
         var st = animator.GetCurrentAnimatorStateInfo(0);
         if (st.IsName(throwState)) return false;
         if (animator.IsInTransition(0)) return false;
@@ -116,7 +113,7 @@ public class EnemyRanged : EnemyBaseNav
         cycleAtStart = -1;
         throwClock = 0f;
 
-        // Ensure the hand visual is visible until we actually release
+        // ensure the hand visual is visible until we actually release
         if (holderVisual != null) holderVisual.SetActive(true);
 
         animator.CrossFadeInFixedTime(throwState, 0.05f);
@@ -163,10 +160,10 @@ public class EnemyRanged : EnemyBaseNav
 
     void ReleaseProjectile()
     {
-        // Hide the hand prop the exact frame we “throw”
+        // hide the hand prop the exact frame we “throw”
         if (holderVisual != null) holderVisual.SetActive(false);
 
-        // Spawn the real projectile only now (no pre-spawn)
+        // spawn the real projectile only now (no pre-spawn)
         Transform spawnXf = projectileHolder != null ? projectileHolder :
                             muzzleFallback   != null ? muzzleFallback   : transform;
 
@@ -210,14 +207,14 @@ public class EnemyRanged : EnemyBaseNav
         cycleAtStart = -1;
         throwClock = 0f;
 
-        // 1.5 s lockout
+        // lockout
         fireTimer = cooldownAfterThrow;
 
-        // Force exit -> Idle so Animator can’t immediately re-trigger
+        // force exit -> Idle so Animator can’t immediately re-trigger
         if (!string.IsNullOrEmpty(idleState))
             animator.CrossFadeInFixedTime(idleState, 0.05f);
 
-        // Restore the hand visual so it looks “reloaded” for the next throw
+        // restore the hand visual so it looks “reloaded” for the next throw
         if (holderVisual != null) holderVisual.SetActive(true);
     }
 

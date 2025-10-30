@@ -29,16 +29,14 @@ public class EncounterSpawner : MonoBehaviour
 
     void Awake()
     {
-        // Collect children as spawn points
+        // collect children as spawn points
         int childCount = transform.childCount;
         points = new Transform[childCount];
         for (int i = 0; i < childCount; i++) points[i] = transform.GetChild(i);
 
-        // Ensure we have a trigger collider
         triggerCol = GetComponent<Collider>();
         triggerCol.isTrigger = true;
 
-        // *** IMPORTANT: add kinematic Rigidbody so CharacterController triggers fire ***
         if (!TryGetComponent<Rigidbody>(out var rb))
         {
             rb = gameObject.AddComponent<Rigidbody>();
@@ -49,7 +47,6 @@ public class EncounterSpawner : MonoBehaviour
 
     void Start()
     {
-        // Cache player
         var pGo = GameObject.FindGameObjectWithTag(playerTag);
         if (pGo != null) player = pGo.transform;
 
@@ -63,7 +60,6 @@ public class EncounterSpawner : MonoBehaviour
             SpawnAll();
     }
 
-    // Extra safety for cases where Enter is missed:
     void OnTriggerStay(Collider other)
     {
         if (!spawnOnPlayerEnter || spawned) return;
@@ -73,7 +69,6 @@ public class EncounterSpawner : MonoBehaviour
 
     void Update()
     {
-        // Last-resort fallback: if player is already inside the trigger at scene start
         if (!spawnOnPlayerEnter || spawned || player == null) return;
         if (triggerCol.bounds.Contains(player.position))
             SpawnAll();
@@ -99,7 +94,7 @@ public class EncounterSpawner : MonoBehaviour
 
     void SpawnGroupAt(Vector3 center, Quaternion rot)
     {
-        // Smalls around a ring
+        // puts smalls around a ring
         for (int i = 0; i < smallPerPoint; i++)
         {
             float ang = (Mathf.PI * 2f) * (i / Mathf.Max(1f, (float)smallPerPoint));
@@ -107,14 +102,13 @@ public class EncounterSpawner : MonoBehaviour
             SpawnOne(smallEnemyPrefab, center + offset, rot);
         }
 
-        // Large near the middle
+        // puts large near the middle
         Vector3 largePos = center + new Vector3(0.4f, 0f, -0.4f);
         SpawnOne(largeEnemyPrefab, largePos, rot);
     }
 
     void SpawnOne(GameObject prefab, Vector3 pos, Quaternion rot)
     {
-        // Optional ground snap
         Vector3 start = pos + Vector3.up * 2f;
         if (Physics.Raycast(start, Vector3.down, out var hit, 5f, groundMask, QueryTriggerInteraction.Ignore))
             pos = hit.point;

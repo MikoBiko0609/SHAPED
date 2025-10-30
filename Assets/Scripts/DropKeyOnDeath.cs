@@ -16,7 +16,6 @@ public class DropKeyOnDeath : MonoBehaviour
         if (hp == null)
             Debug.LogWarning($"{name}: DropKeyOnDeath needs a Health component!");
 
-        // Register key prefab once for the exit puzzle system
         if (keyPrefab != null)
             KeyFloating.SetSharedPrefab(keyPrefab);
     }
@@ -50,7 +49,6 @@ public class DropKeyOnDeath : MonoBehaviour
     {
         if (keyPrefab == null) return;
 
-        // Your hardcoded vertical drop offset:
         Vector3 pos = transform.position + Vector3.up * -1f;
         var go = Instantiate(keyPrefab, pos, Quaternion.identity);
 
@@ -59,7 +57,6 @@ public class DropKeyOnDeath : MonoBehaviour
         {
             kf.SetModeDropped();
 
-            // Large enemies: use per-run unique sequence (no repeats, random order)
             if (isLargeEnemy)
             {
                 KeyColor uniqueRunColor = KeyFloating.NextLargeDropColor();
@@ -67,7 +64,6 @@ public class DropKeyOnDeath : MonoBehaviour
             }
             else
             {
-                // Small enemies (if they ever drop): fully random
                 kf.SetColor(KeyFloating.RandomColor());
             }
         }

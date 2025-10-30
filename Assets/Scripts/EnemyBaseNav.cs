@@ -7,15 +7,15 @@ public abstract class EnemyBaseNav : MonoBehaviour
     [Header("Refs")]
     public GridNav grid;
     public Transform target;
-    public Transform lookPivot;             // rotate this if present, else rotate root
-    public Animator animator;               // optional (Idle/Walking)
+    public Transform lookPivot;   
+    public Animator animator;              
 
     [Header("Move")]
     public float moveSpeed = 3.5f;
     public float repathInterval = 0.40f;
-    public float waypointReachDist = 0.55f; // larger reach kills node ping-pong
-    public float cornerReachDist = 0.50f;   // when we use far corner targets
-    public float maxTurnDegPerSec = 360f;   // calmer turning
+    public float waypointReachDist = 0.55f;
+    public float cornerReachDist = 0.50f;
+    public float maxTurnDegPerSec = 360f;
 
     [Header("Height Lock")]
     public bool lockY = true;
@@ -32,18 +32,16 @@ public abstract class EnemyBaseNav : MonoBehaviour
     float repathTimer;
     string curAnim = "";
 
-    // “Sticky corner” so we don’t keep flipping between two nearby nodes
+    // “sticky corner” so we don’t keep flipping between two nearby nodes
     int cornerIndex = -1;
     Vector3 cornerPoint;
     float cornerRecalcTimer = 0f;
 
-    // Smoother, non-oscillating direction low-pass (no SmoothDamp velocity ping-pong)
     Vector3 dirSmooth = Vector3.forward;
 
-    // Cache to avoid repath spam when goal barely moves
+    // cache to avoid repath spam when goal barely moves
     Vector3 lastGoalRequested = new Vector3(9999, 9999, 9999);
 
-    // Small constants
     const float EPS = 0.0001f;
 
     protected virtual void Awake()
@@ -71,7 +69,7 @@ public abstract class EnemyBaseNav : MonoBehaviour
     {
         if (grid == null || target == null) { PlayIdle(); HardLockY(); return; }
 
-        // Ask child where it wants to go; false => hold position
+        // ask child where it wants to go; false => hold position
         if (!TryGetGoal(out Vector3 goalWorld))
         {
             PlayIdle();
@@ -80,9 +78,9 @@ public abstract class EnemyBaseNav : MonoBehaviour
             return;
         }
 
-        // Repath on timer or when goal moved enough
+        // repath on timer or when goal moved enough
         repathTimer -= Time.deltaTime;
-        bool goalShifted = (goalWorld - lastGoalRequested).sqrMagnitude > 1.0f * 1.0f; // >1m change
+        bool goalShifted = (goalWorld - lastGoalRequested).sqrMagnitude > 1.0f * 1.0f;
         if (repathTimer <= 0f || goalShifted || path.Count == 0)
         {
             repathTimer = repathInterval;
@@ -102,7 +100,7 @@ public abstract class EnemyBaseNav : MonoBehaviour
 
         if (path.Count == 0) { PlayIdle(); HardLockY(); return; }
 
-        // Refresh corner target occasionally to avoid going stale while moving
+        // refresh corner target occasionally to avoid going stale while moving
         cornerRecalcTimer -= Time.deltaTime;
         if (cornerRecalcTimer <= 0f) ChooseCornerTarget();
 
@@ -113,7 +111,7 @@ public abstract class EnemyBaseNav : MonoBehaviour
         desired.y = 0f;
         if (desired.sqrMagnitude < 0.01f) // very close, advance corner/waypoint
         {
-            // Advance waypoint if we’re near the current one
+            // advance waypoint if we’re near the current one
             if (wpIndex < path.Count)
             {
                 if (Vector3.Distance(transform.position, path[wpIndex]) < waypointReachDist)
@@ -126,30 +124,27 @@ public abstract class EnemyBaseNav : MonoBehaviour
         }
         desired.Normalize();
 
-        // Direction low-pass without oscillation: exponential slerp
+        // direction low-pass without oscillation: exponential slerp
         float lerp = 1f - Mathf.Exp(-10f * Time.deltaTime); // snappy, stable
         dirSmooth = Vector3.Slerp(dirSmooth, desired, lerp);
         if (dirSmooth.sqrMagnitude > EPS) dirSmooth.Normalize();
 
-        // Rotate only around Y
+        // rotate only around Y
         Quaternion tRot = Quaternion.LookRotation(new Vector3(dirSmooth.x, 0f, dirSmooth.z), Vector3.up);
         float step = maxTurnDegPerSec * Time.deltaTime;
         if (lookPivot != null) lookPivot.rotation = Quaternion.RotateTowards(lookPivot.rotation, tRot, step);
         else                   transform.rotation = Quaternion.RotateTowards(transform.rotation, tRot, step);
 
-        // Move forward
+        // move forward
         Vector3 delta = dirSmooth * moveSpeed * Time.deltaTime;
         cc.Move(delta);
 
-        // Reached the corner? advance it, not the tiny grid node
         if (cornerIndex >= 0 && Vector3.Distance(transform.position, cornerPoint) < cornerReachDist)
         {
-            // push corner forward to the next far visible point
             AdvanceCornerTarget();
         }
         else
         {
-            // Also advance raw wp if we get very near
             if (wpIndex < path.Count && Vector3.Distance(transform.position, path[wpIndex]) < waypointReachDist)
                 wpIndex = Mathf.Min(wpIndex + 1, path.Count - 1);
         }
@@ -159,12 +154,11 @@ public abstract class EnemyBaseNav : MonoBehaviour
         AfterMove();
     }
 
-    // ---- Sticky corner logic ----
     void ChooseCornerTarget()
     {
         cornerIndex = -1;
         cornerPoint = Vector3.zero;
-        cornerRecalcTimer = 0.25f; // don’t recalc every frame
+        cornerRecalcTimer = 0.25f; 
 
         if (path.Count <= 1) return;
 
@@ -235,6 +229,5 @@ public abstract class EnemyBaseNav : MonoBehaviour
     void PlayIdle() => CrossfadeIfNew(idleState, 1f);
     void PlayWalk() => CrossfadeIfNew(walkState, Mathf.Max(0.1f, moveSpeed / Mathf.Max(0.1f, walkAnimBaseSpeed)));
 
-    /// <summary>Child returns a goal (world position) to move toward/away. Return false to stand still.</summary>
     protected abstract bool TryGetGoal(out Vector3 goalWorld);
 }

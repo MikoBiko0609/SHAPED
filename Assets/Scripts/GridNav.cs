@@ -8,13 +8,12 @@ public class GridNav : MonoBehaviour
     public float cellSize = 0.5f;
 
     [Header("Obstacles")]
-    public LayerMask obstacleMask;       // MUST be only your wall layers (not floor/player)
-    public float clearanceHeight = 2f;   // vertical clearance checked per cell
+    public LayerMask obstacleMask;       
+    public float clearanceHeight = 2f;  
 
     [Header("Debug")]
     public bool drawGizmos = true;
 
-    // ----- Internal node -----
     class Node {
         public bool walk;
         public Vector3 w;
@@ -30,7 +29,6 @@ public class GridNav : MonoBehaviour
 
     void Awake() => Build();
 
-    // Build occupancy from colliders in obstacleMask
     public void Build()
     {
         cols = Mathf.Max(1, Mathf.RoundToInt(size.x / cellSize));
@@ -55,34 +53,33 @@ public class GridNav : MonoBehaviour
         }
     }
 
-    // Public path API (Vector3 → waypoints)
     public bool FindPath(Vector3 a, Vector3 b, List<Vector3> outPts)
     {
         outPts.Clear();
         if (nodes == null) return false;
 
-        // Snap start to closest walkable if needed
+        // snap start to closest walkable if needed
         if (!WorldToNode(a, out var s) || !s.walk)
         {
             if (!ClosestWalkable(a, out var fixedStart)) return false;
             if (!WorldToNode(fixedStart, out s)) return false;
         }
 
-        // Snap end to closest walkable if needed
+        // snap end to closest walkable if needed
         if (!WorldToNode(b, out var e) || !e.walk)
         {
             if (!ClosestWalkable(b, out var fixedGoal)) return false;
             if (!WorldToNode(fixedGoal, out e)) return false;
         }
 
-        // Reset costs/parents
+        // reset costs/parents
         foreach (var n in nodes) { n.g = 0; n.h = 0; n.p = null; }
 
         var open = new List<Node>(128);
         var closed = new HashSet<Node>();
         open.Add(s);
 
-        // Local iterator with corner-cut prevention
+        // local iterator with corner-cut prevention
         System.Collections.Generic.IEnumerable<Node> Nbs(Node n)
         {
             for (int dx = -1; dx <= 1; dx++)
@@ -95,7 +92,7 @@ public class GridNav : MonoBehaviour
                 var c = nodes[nx, ny];
                 if (!c.walk) continue;
 
-                // Block diagonal corner cutting
+                // block diagonal corner cutting
                 if (dx != 0 && dy != 0)
                 {
                     var a1 = nodes[n.x + dx, n.y];
@@ -106,13 +103,11 @@ public class GridNav : MonoBehaviour
             }
         }
 
-        // A* loop
         while (open.Count > 0)
         {
             Node cur = open[0];
             for (int i = 1; i < open.Count; i++)
             {
-                // Favor lower f, then lower h, then closer to end in euclidean (tiny tie-break)
                 var n = open[i];
                 if (n.f < cur.f || (n.f == cur.f && (n.h < cur.h ||
                     (n.h == cur.h && (n.x - e.x)*(n.x - e.x) + (n.y - e.y)*(n.y - e.y) <
@@ -127,13 +122,11 @@ public class GridNav : MonoBehaviour
 
             if (cur == e)
             {
-                // Reconstruct
                 var t = e;
                 outPts.Add(t.w);
                 while (t != s) { t = t.p; outPts.Add(t.w); }
                 outPts.Reverse();
 
-                // Smooth the path to kill zig-zags/spins
                 SmoothCollinear(outPts);
                 StraightenWithRaycasts(outPts);
 
@@ -144,7 +137,7 @@ public class GridNav : MonoBehaviour
             {
                 if (closed.Contains(nb)) continue;
 
-                int step = (nb.x == cur.x || nb.y == cur.y) ? 10 : 14; // straight/diag
+                int step = (nb.x == cur.x || nb.y == cur.y) ? 10 : 14; 
                 int gNew = cur.g + step;
                 bool inOpen = open.Contains(nb);
 
@@ -152,7 +145,6 @@ public class GridNav : MonoBehaviour
                 {
                     nb.g = gNew;
 
-                    // Octile heuristic (good for 8-connectivity grids)
                     int dx = Mathf.Abs(nb.x - e.x), dy = Mathf.Abs(nb.y - e.y);
                     nb.h = 14 * Mathf.Min(dx, dy) + 10 * Mathf.Abs(dx - dy);
 
@@ -165,7 +157,7 @@ public class GridNav : MonoBehaviour
         return false;
     }
 
-    // ---- Utility: find closest walkable node near a world pos ----
+    // ---- utility: find closest walkable node near a world pos ----
     public bool ClosestWalkable(Vector3 world, out Vector3 bestW, int maxRadiusCells = 8)
     {
         bestW = default;
@@ -187,7 +179,7 @@ public class GridNav : MonoBehaviour
         return false;
     }
 
-    // ---- Helpers ----
+    // ---- helpers ----
     bool WorldToNode(Vector3 w, out Node n)
     {
         Vector3 local = w - (transform.position - new Vector3(size.x, 0f, size.y) * 0.5f);
@@ -197,7 +189,6 @@ public class GridNav : MonoBehaviour
         n = nodes[x, y]; return true;
     }
 
-    // Remove middle points that are nearly collinear (reduces tiny turns)
     void SmoothCollinear(List<Vector3> pts)
     {
         if (pts.Count <= 2) return;
@@ -209,12 +200,10 @@ public class GridNav : MonoBehaviour
         }
     }
 
-    // Try to "see" ahead and skip intermediate waypoints when there's clear LoS
     void StraightenWithRaycasts(List<Vector3> pts)
     {
         if (pts.Count <= 2) return;
 
-        // Cast slightly above ground to avoid floor hits; use the same obstacleMask
         float castHeight = 0.5f;
         int i = 0;
         while (i < pts.Count - 2)

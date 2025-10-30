@@ -14,9 +14,8 @@ public class PlayerController : MonoBehaviour
     public float minPitch = -85f, maxPitch = 85f;
 
     [Header("Refs")]
-    public Transform cameraPivot;     // Player/CameraPivot
-    public Blaster blaster;           // child under GunRoot (auto-found)
-
+    public Transform cameraPivot;    
+    public Blaster blaster;           
     [Header("Gravity")]
     public float gravity = -20f;
     public float groundedGravity = -2f;
@@ -26,7 +25,6 @@ public class PlayerController : MonoBehaviour
     Vector3 externalVel;
     public void AddImpulse(Vector3 v) { externalVel += v; }
 
-    // —— NEW ——
     [Header("Death / Respawn")]
     public float respawnDelay = 0.75f;
     Health health;
@@ -47,11 +45,9 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            // Listen for death event
             health.onDied.AddListener(OnPlayerDied);
         }
 
-        // ---- AUTO-WIRE scene refs by name (no markers) ----
         if (cameraPivot == null)
         {
             var pivot = transform.Find("CameraPivot");
@@ -87,7 +83,7 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        // --- Look ---
+        // look
         if (cameraPivot != null)
         {
             float mx = Input.GetAxis("Mouse X") * mouseSensitivity;
@@ -103,7 +99,7 @@ public class PlayerController : MonoBehaviour
             transform.eulerAngles = e;
         }
 
-        // --- Move ---
+        // move
         float h = Input.GetAxisRaw("Horizontal");
         float v = Input.GetAxisRaw("Vertical");
         Vector3 input = Vector3.ClampMagnitude(new Vector3(h, 0f, v), 1f);
@@ -121,7 +117,7 @@ public class PlayerController : MonoBehaviour
 
         cc.Move((world + externalVel + vel) * Time.deltaTime);
 
-        // --- Fire ---
+        // fire
         if (Input.GetButton("Fire1") && blaster != null)
             blaster.Blast();
 
@@ -134,7 +130,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ——— NEW death handler ———
     void OnPlayerDied()
     {
         StartCoroutine(RespawnRoutine());
@@ -144,7 +139,6 @@ public class PlayerController : MonoBehaviour
     {
         yield return new WaitForSeconds(respawnDelay);
 
-        // Make sure time is normal (in case pause/slowmo later)
         Time.timeScale = 1f;
 
         var scene = SceneManager.GetActiveScene();

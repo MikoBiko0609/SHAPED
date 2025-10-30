@@ -19,7 +19,6 @@ public class Health : MonoBehaviour
         Current = Mathf.Max(1, maxHP);
     }
 
-    /// <summary>Deal damage. Returns true if damage was applied.</summary>
     public bool TakeDamage(int amount, Vector3 hitPoint = default, Vector3 hitNormal = default, Object source = null)
     {
         if (IsDead || amount <= 0) return false;
