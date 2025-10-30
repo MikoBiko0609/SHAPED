@@ -56,22 +56,19 @@ public class EncounterSpawner : MonoBehaviour
     void OnTriggerEnter(Collider other)
     {
         if (!spawnOnPlayerEnter || spawned) return;
-        if (other.CompareTag(playerTag))
-            SpawnAll();
+        if (other.CompareTag(playerTag)) SpawnAll();
     }
 
     void OnTriggerStay(Collider other)
     {
         if (!spawnOnPlayerEnter || spawned) return;
-        if (other.CompareTag(playerTag))
-            SpawnAll();
+        if (other.CompareTag(playerTag)) SpawnAll();
     }
 
     void Update()
     {
         if (!spawnOnPlayerEnter || spawned || player == null) return;
-        if (triggerCol.bounds.Contains(player.position))
-            SpawnAll();
+        if (triggerCol.bounds.Contains(player.position)) SpawnAll();
     }
 
     public void SpawnAll()
@@ -94,7 +91,7 @@ public class EncounterSpawner : MonoBehaviour
 
     void SpawnGroupAt(Vector3 center, Quaternion rot)
     {
-        // puts smalls around a ring
+        // smalls around a ring
         for (int i = 0; i < smallPerPoint; i++)
         {
             float ang = (Mathf.PI * 2f) * (i / Mathf.Max(1f, (float)smallPerPoint));
@@ -102,9 +99,10 @@ public class EncounterSpawner : MonoBehaviour
             SpawnOne(smallEnemyPrefab, center + offset, rot);
         }
 
-        // puts large near the middle
+        // large near the middle
         Vector3 largePos = center + new Vector3(0.4f, 0f, -0.4f);
-        SpawnOne(largeEnemyPrefab, largePos, rot);
+        for (int i = 0; i < Mathf.Max(1, largePerPoint); i++)
+            SpawnOne(largeEnemyPrefab, largePos, rot);
     }
 
     void SpawnOne(GameObject prefab, Vector3 pos, Quaternion rot)
@@ -115,5 +113,12 @@ public class EncounterSpawner : MonoBehaviour
 
         pos.y += yOffset;
         Instantiate(prefab, pos, rot);
+    }
+
+    // Called by the puzzle reset to make this encounter available again
+    public void ResetAndRespawn()
+    {
+        spawned = false;
+        SpawnAll();
     }
 }

@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 public class KeyFloating : MonoBehaviour
 {
     [Header("Visuals")]
-    public KeyColor keyColor = KeyColor.Pink;                   
-    public List<MeshRenderer> colorRenderers = new();            
-    public string colorProperty = "_Color";           
+    public KeyColor keyColor = KeyColor.Pink;
+    public List<MeshRenderer> colorRenderers = new();
+    public string colorProperty = "_Color"; 
 
     [Header("Float/Spin")]
     public float bobAmplitude = 0.15f;
@@ -16,19 +15,31 @@ public class KeyFloating : MonoBehaviour
     public float spinDegPerSec = 90f;
 
     [Header("Visual Offset")]
-    public float heightOffset = 0f;                             
+    public float heightOffset = 0f;        
 
     [Header("Lifetime")]
-    public float autoDespawnSeconds = 0f;                 
+    public float autoDespawnSeconds = 0f;
 
     [Header("Interaction")]
-    public bool isExitGridKey = false;                           
+    public bool isExitGridKey = false;    
     public float pickupRadius = 1.3f;
     public string playerTag = "Player";
 
-    float t0;
-    float baseY;
+    float t0, baseY;
     MaterialPropertyBlock mpb;
+
+
+    static readonly List<KeyFloating> activeDrops = new();
+    public static void RegisterDrop(KeyFloating kf)
+    {
+        if (kf != null && !activeDrops.Contains(kf)) activeDrops.Add(kf);
+    }
+    static void ClearDroppedKeys()
+    {
+        for (int i = 0; i < activeDrops.Count; i++)
+            if (activeDrops[i] != null) Object.Destroy(activeDrops[i].gameObject);
+        activeDrops.Clear();
+    }
 
     void Awake()
     {
@@ -40,42 +51,35 @@ public class KeyFloating : MonoBehaviour
 
     void Start()
     {
-        if (autoDespawnSeconds > 0f)
-            Destroy(gameObject, autoDespawnSeconds);
+        if (autoDespawnSeconds > 0f) Destroy(gameObject, autoDespawnSeconds);
     }
 
     void Update()
     {
+        // float & spin
         float t = Time.time - t0;
-        Vector3 p = transform.position;
+        var p = transform.position;
         p.y = baseY + heightOffset + Mathf.Sin(t * bobSpeed) * bobAmplitude;
         transform.position = p;
         transform.Rotate(Vector3.up, spinDegPerSec * Time.deltaTime, Space.World);
 
-        // exit-grid: auto-pickup by proximity
+        // Grid keys auto-pickup on proximity
         if (isExitGridKey && PlayerWithinRadius(out _))
         {
-            // consume on enter
             bool ok = ValidatePick(keyColor);
             Destroy(gameObject);
 
             if (!ok)
             {
-                DespawnExitGrid();
-                ResetBossDrops();
+                // Full soft reset so player can re-run the encounter
+                ResetRunWorld();
             }
-            else
+            else if (picksSoFar >= requiredPicks)
             {
-                if (picksSoFar >= requiredPicks)
-                {
-                    GameObject door = GameObject.Find("DoorRoot");
-                    if (door != null)
-                    {
-                        var dc = door.GetComponent<DoorController>();
-                        if (dc != null)
-                            dc.OpenDoor();
-                    }
-                }
+                // All 4 correct -> open door
+                var door = GameObject.Find("DoorRoot");
+                if (door != null && door.TryGetComponent<DoorController>(out var dc))
+                    dc.OpenDoor();
             }
         }
     }
@@ -89,20 +93,14 @@ public class KeyFloating : MonoBehaviour
         return (player.position - transform.position).sqrMagnitude <= pickupRadius * pickupRadius;
     }
 
-    // color helpers
-    public void SetColor(KeyColor c)
-    {
-        keyColor = c;
-        ApplyColor();
-    }
+    public void SetColor(KeyColor c) { keyColor = c; ApplyColor(); }
 
     void ApplyColor()
     {
         Color col = ColorFor(keyColor);
         for (int i = 0; i < colorRenderers.Count; i++)
         {
-            var r = colorRenderers[i];
-            if (r == null) continue;
+            var r = colorRenderers[i]; if (!r) continue;
             r.GetPropertyBlock(mpb);
             mpb.SetColor(colorProperty, col);
             r.SetPropertyBlock(mpb);
@@ -128,44 +126,30 @@ public class KeyFloating : MonoBehaviour
         _ => Color.white
     };
 
-    public void SetModeDropped()
-    {
-        isExitGridKey = false;           // dropped keys are NOT pickable
-        // keep current heightOffset as-is (usually 0)
-    }
+    public void SetModeDropped() { isExitGridKey = false; }
+    public void SetModeExitGrid() { isExitGridKey = true; heightOffset += 1f; }
 
-    public void SetModeExitGrid()
-    {
-        isExitGridKey = true;            // grid keys are pickable
-        heightOffset += 1f;              // raise ONLY the grid keys by +1
-    }
-
-    // exit grid
     static GameObject sharedKeyPrefab;
     public static void SetSharedPrefab(GameObject keyPrefab) => sharedKeyPrefab = keyPrefab;
 
-    // large-enemy drops needed before the grid appears
     static int bossDrops = 0;
     public static int requiredBossDrops = 4;
 
-    // 8 colors
     static readonly KeyColor[] allEight =
         { KeyColor.Red, KeyColor.Blue, KeyColor.Green, KeyColor.Purple, KeyColor.Pink, KeyColor.Orange, KeyColor.Black, KeyColor.White };
 
-    // the 4 correct colors for THIS run
     static KeyColor[] runSolution = new KeyColor[4];
-
     static HashSet<KeyColor> correctSet = new();
     static int picksSoFar = 0;
     static int requiredPicks = 4;
 
     static List<KeyFloating> activeGrid = new();
-    static Transform exitRoot; 
+    static Transform exitRoot;
 
     public static void ResetBossDrops()
     {
         bossDrops = 0;
-        ResetRunLargeDropColors(); // fresh unique set for next run attempt
+        ResetRunLargeDropColors(); // new 4-color code for the next attempt
     }
 
     public static void NotifyBossDrop()
@@ -180,87 +164,59 @@ public class KeyFloating : MonoBehaviour
 
     static void SpawnExitGrid()
     {
-        if (sharedKeyPrefab == null)
-        {
-            Debug.LogWarning("KeyFloating: shared key prefab not set. Call SetSharedPrefab(keyPrefab) before spawning the grid.");
-            return;
-        }
+        if (sharedKeyPrefab == null) { Debug.LogWarning("KeyFloating: shared key prefab not set."); return; }
 
         if (exitRoot == null)
         {
             var rootGO = GameObject.Find("ExitGridRoot");
-            if (rootGO == null)
-            {
-                Debug.LogWarning("Place an empty named 'ExitGridRoot' at the exit to position the 2×4 key grid.");
-                return;
-            }
+            if (rootGO == null) { Debug.LogWarning("Place an empty 'ExitGridRoot' to position the key grid."); return; }
             exitRoot = rootGO.transform;
         }
 
-        // clears previous grid
         DespawnExitGrid();
 
-        // the correct set IS the 4 unique large-drop colors for this run
         correctSet.Clear();
         picksSoFar = 0;
         requiredPicks = 4;
         for (int i = 0; i < 4; i++) correctSet.Add(runSolution[i]);
 
-        // builds a 2×4 grid (one of each of the 8 colors)
         Vector3 basePos = exitRoot.position;
         Quaternion rot = exitRoot.rotation;
-
-        // spreads keys further apart
-        const float spacingX = 2.2f;
-        const float spacingZ = 2.2f;
+        const float spacingX = 2.2f, spacingZ = 2.2f;
 
         for (int i = 0; i < allEight.Length; i++)
         {
-            int row = i / 4;                           
-            int col = i % 4;                         
+            int row = i / 4, col = i % 4;
             Vector3 offset = new((col - 1.5f) * spacingX, 0f, (row - 0.5f) * spacingZ);
 
             var go = Object.Instantiate(sharedKeyPrefab, basePos + offset, rot);
             var kf = go.GetComponent<KeyFloating>();
             if (kf != null)
             {
-                kf.SetModeExitGrid();                  // makes them +1 higher and pickable by proximity
+                kf.SetModeExitGrid();
                 kf.SetColor(allEight[i]);
                 activeGrid.Add(kf);
             }
         }
 
-        Debug.Log("[KeyPuzzle] Grid spawned. Correct colors = the 4 large drops from this run.");
+        Debug.Log("[KeyPuzzle] Grid spawned.");
     }
 
     static void DespawnExitGrid()
     {
         for (int i = 0; i < activeGrid.Count; i++)
-        {
-            if (activeGrid[i] != null)
-                Object.Destroy(activeGrid[i].gameObject);
-        }
+            if (activeGrid[i] != null) Object.Destroy(activeGrid[i].gameObject);
         activeGrid.Clear();
     }
 
-    // returns true if the pick is correct 
     static bool ValidatePick(KeyColor picked)
     {
-        if (!correctSet.Contains(picked))
-        {
-            Debug.Log("[KeyPuzzle] WRONG key: " + picked);
-            return false;
-        }
-
-        if (correctSet.Remove(picked))
-        {
-            picksSoFar++;
-            Debug.Log($"[KeyPuzzle] Correct: {picked}. {picksSoFar}/{requiredPicks}");
-        }
+        if (!correctSet.Contains(picked)) { Debug.Log("[KeyPuzzle] WRONG key: " + picked); return false; }
+        if (correctSet.Remove(picked)) { picksSoFar++; Debug.Log($"[KeyPuzzle] Correct: {picked}. {picksSoFar}/{requiredPicks}"); }
         return true;
     }
 
-    static Queue<KeyColor> runLargeDropQueue;   // 4 unique colors in random order
+    static Queue<KeyColor> runLargeDropQueue;
     static bool runColorsReady = false;
 
     static void EnsureRunLargeDropColors()
@@ -268,20 +224,10 @@ public class KeyFloating : MonoBehaviour
         if (runColorsReady && runLargeDropQueue != null && runLargeDropQueue.Count > 0) return;
 
         var bag = new List<KeyColor>(allEight);
-        for (int i = bag.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (bag[i], bag[j]) = (bag[j], bag[i]);
-        }
+        for (int i = bag.Count - 1; i > 0; i--) { int j = Random.Range(0, i + 1); (bag[i], bag[j]) = (bag[j], bag[i]); }
 
-        // take the first 4 unique colors for this run
         runLargeDropQueue = new Queue<KeyColor>(4);
-        for (int i = 0; i < 4; i++)
-        {
-            runLargeDropQueue.Enqueue(bag[i]);
-            runSolution[i] = bag[i]; // store the solution set for the exit puzzle
-        }
-
+        for (int i = 0; i < 4; i++) { runLargeDropQueue.Enqueue(bag[i]); runSolution[i] = bag[i]; }
         runColorsReady = true;
     }
 
@@ -295,11 +241,37 @@ public class KeyFloating : MonoBehaviour
     public static KeyColor NextLargeDropColor()
     {
         EnsureRunLargeDropColors();
-        if (runLargeDropQueue.Count == 0)
-        {
-            // Safety: reinitialize if empty
-            ResetRunLargeDropColors();
-        }
+        if (runLargeDropQueue.Count == 0) ResetRunLargeDropColors();
         return runLargeDropQueue.Dequeue();
+    }
+
+    public static void ResetRunWorld()
+    {
+        // 1) remove puzzle grid
+        DespawnExitGrid();
+
+        // 2) remove previously dropped keys
+        ClearDroppedKeys();
+
+        // 3) clean up enemies & projectiles
+        // kill all enemies
+        foreach (var e in FindObjectsByType<EnemyBaseNav>(FindObjectsSortMode.None))
+            if (e != null) Destroy(e.gameObject);
+
+        // kill all projectiles
+        foreach (var p in FindObjectsByType<Projectile>(FindObjectsSortMode.None))
+            if (p != null) Destroy(p.gameObject);
+
+        // kill all cube projectiles
+        foreach (var c in FindObjectsByType<CubeProjectile>(FindObjectsSortMode.None))
+            if (c != null) Destroy(c.gameObject);
+
+        // 4) reset all spawners
+        foreach (var sp in FindObjectsByType<EncounterSpawner>(FindObjectsSortMode.None))
+            if (sp != null) sp.ResetAndRespawn();
+
+
+        // 5) reset counters and choose a fresh code
+        ResetBossDrops();
     }
 }
